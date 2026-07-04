@@ -407,15 +407,12 @@
 </head>
 <body>
     <div class="container-main">
-        <!-- Header -->
         <div class="header">
             <h1><i class="fas fa-university"></i> Advanced Bank Statement Converter</h1>
             <p>Smart PDF to Excel conversion with intelligent data extraction</p>
         </div>
 
-        <!-- Content -->
         <div class="content">
-            <!-- Features -->
             <div class="features">
                 <div class="feature-card">
                     <div class="feature-icon"><i class="fas fa-brain"></i></div>
@@ -434,10 +431,8 @@
                 </div>
             </div>
 
-            <!-- Status Messages -->
             <div class="status-message" id="statusMessage"></div>
 
-            <!-- Loading Spinner -->
             <div class="loading-spinner" id="loadingSpinner">
                 <div class="spinner-border" role="status" style="color: #667eea;">
                     <span class="visually-hidden">Loading...</span>
@@ -445,7 +440,6 @@
                 <p style="margin-top: 10px; color: #667eea; font-weight: 600;">Processing PDF...</p>
             </div>
 
-            <!-- Upload Section -->
             <div class="upload-section" id="uploadSection">
                 <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                 <h3>Upload Bank Statement PDF</h3>
@@ -456,7 +450,6 @@
                 </button>
             </div>
 
-            <!-- Action Buttons -->
             <div class="action-buttons">
                 <button class="btn-custom btn-sample" onclick="loadSampleData()">
                     <i class="fas fa-download"></i> Load Sample Data
@@ -469,7 +462,6 @@
                 </button>
             </div>
 
-            <!-- Stats -->
             <div class="stats" id="stats" style="display: none;">
                 <div class="stat-box">
                     <div class="stat-number" id="totalTransactions">0</div>
@@ -489,7 +481,6 @@
                 </div>
             </div>
 
-            <!-- Table Section -->
             <div class="table-section" id="tableSection">
                 <div class="table-title"><i class="fas fa-list"></i> Bank Statement Details</div>
                 <div class="table-wrapper">
@@ -562,7 +553,22 @@
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    
+                    let pageText = '';
+                    let lastY = null;
+
+                    // FIX 1: Detect line breaks based on Y-coordinates
+                    textContent.items.forEach(item => {
+                        // transform[5] represents the vertical position of the text block
+                        if (lastY !== item.transform[5] && lastY !== null) {
+                            pageText += '\n'; // Start a new line
+                        } else {
+                            pageText += ' '; // Add space between words on the same line
+                        }
+                        pageText += item.str.trim();
+                        lastY = item.transform[5];
+                    });
+                    
                     fullText += pageText + '\n';
                 }
 
@@ -579,48 +585,41 @@
             transactionData = [];
             const lines = text.split('\n');
 
-            // Enhanced regex patterns for bank statement parsing
-            const datePattern = /(\d{1,2}[-\/]\d{1,2}[-\/]\d{4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2})/;
-            const amountPattern = /(\d{1,3}(?:,\d{3})*|\d+)(?:\.\d{2})?/;
-            
             let sno = 0;
             let previousBalance = 0;
 
-            // Process each line
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 
-                // Skip empty lines and header rows
                 if (!line || line.includes('Transaction Date') || line.includes('S.NO') || line.includes('Particulars')) {
                     continue;
                 }
 
-                // Try to match transaction pattern
-                const dates = line.match(/\d{1,2}[-\/]\d{1,2}[-\/]\d{4}/g);
-                const amounts = line.match(/\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g);
+                // FIX 2: Stricter Regex
+                // Matches dates like DD/MM/YYYY, DD-MM-YY, DD.MM.YYYY
+                const dates = line.match(/\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}/g);
+                
+                // Matches proper currency formats (must end in decimal) to avoid grabbing cheque numbers
+                const amounts = line.match(/\d{1,3}(?:,\d{3})*\.\d{2}/g); 
 
                 if (dates && dates.length >= 1 && amounts && amounts.length >= 1) {
                     try {
-                        // Extract data from the line
                         let transDate = formatDate(dates[0]);
                         let valueDate = dates.length > 1 ? formatDate(dates[1]) : transDate;
                         
-                        // Find particulars (text between dates)
                         let particulars = extractParticulars(line, dates);
                         
-                        // Process amounts
+                        // Parse amounts properly
                         let amount = parseFloat(amounts[0].replace(/,/g, ''));
                         let balance = parseFloat(amounts[amounts.length - 1].replace(/,/g, ''));
                         
-                        // Determine if Debit or Credit
                         let type = 'Debit';
-                        if (i > 0 && balance > previousBalance) {
+                        if (i > 0 && balance >= previousBalance) {
                             type = 'Credit';
                         } else if (balance < previousBalance) {
                             type = 'Debit';
                         }
 
-                        // Extract cheque number if present
                         let cheque = extractChequeNumber(line);
 
                         sno++;
@@ -628,7 +627,7 @@
                             sno: sno,
                             transDate: transDate,
                             valueDate: valueDate,
-                            particulars: particulars.substring(0, 40), // Limit length
+                            particulars: particulars.substring(0, 50),
                             amount: amount,
                             type: type,
                             balance: balance,
@@ -644,8 +643,7 @@
             }
 
             if (transactionData.length === 0) {
-                showMessage('No transactions found in PDF. Please check format or load sample data.', 'warning');
-                loadSampleData();
+                showMessage('No transactions found in PDF. The statement format might not match the parser.', 'warning');
             } else {
                 showMessage(`Successfully extracted ${transactionData.length} transactions from PDF!`, 'success');
                 renderTable();
@@ -653,16 +651,13 @@
         }
 
         function formatDate(dateStr) {
-            // Handle various date formats: DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY, etc.
-            let parts = dateStr.split(/[-\/]/);
-            
+            let parts = dateStr.split(/[-\/\.]/);
             if (parts.length !== 3) return dateStr;
             
             let day = parts[0].padStart(2, '0');
             let month = parts[1].padStart(2, '0');
             let year = parts[2];
             
-            // Handle 2-digit year
             if (year.length === 2) {
                 year = (parseInt(year) < 50) ? '20' + year : '19' + year;
             }
@@ -672,26 +667,23 @@
 
         function extractParticulars(line, dates) {
             let particulars = line;
-            // Remove dates from the line
             dates.forEach(date => {
                 particulars = particulars.replace(date, '').replace(/,/g, ' ');
             });
-            // Clean up extra whitespace
             particulars = particulars.replace(/\s+/g, ' ').trim();
-            // Remove amounts
-            particulars = particulars.replace(/\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g, '').trim();
+            // Remove amounts from particulars text
+            particulars = particulars.replace(/\d{1,3}(?:,\d{3})*\.\d{2}/g, '').trim();
             return particulars || 'Transaction';
         }
 
         function extractChequeNumber(line) {
-            // Look for cheque number patterns
-            const chequePattern = /(?:CHQ|Check|Cheque)[:\s]+(\d+)/i;
+            const chequePattern = /(?:CHQ|Check|Cheque|Chq)[:\s-]*(\d+)/i;
             const match = line.match(chequePattern);
             if (match && match[1]) {
                 return 'CHQ' + match[1];
             }
-            // Look for standalone numbers that might be cheques
-            const numbers = line.match(/\b\d{6,10}\b/g);
+            // Looks for isolated 6-digit cheque numbers common in banking
+            const numbers = line.match(/\b\d{6}\b/g);
             if (numbers && numbers.length > 0) {
                 return numbers[0];
             }
@@ -702,16 +694,8 @@
             transactionData = [
                 { sno: 1, transDate: '01/07/2024', valueDate: '01/07/2024', particulars: 'Opening Balance', amount: 50000, type: 'Credit', balance: 50000, cheque: '-' },
                 { sno: 2, transDate: '02/07/2024', valueDate: '02/07/2024', particulars: 'Salary Credit - ABC Corporation', amount: 75000, type: 'Credit', balance: 125000, cheque: '-' },
-                { sno: 3, transDate: '03/07/2024', valueDate: '03/07/2024', particulars: 'Electricity Bill Payment TATA Power', amount: 2500, type: 'Debit', balance: 122500, cheque: 'CHQ001' },
-                { sno: 4, transDate: '05/07/2024', valueDate: '05/07/2024', particulars: 'Shopping Online Purchase Amazon', amount: 5000, type: 'Debit', balance: 117500, cheque: '-' },
-                { sno: 5, transDate: '08/07/2024', valueDate: '08/07/2024', particulars: 'Dividend Income Investment Account', amount: 3500, type: 'Credit', balance: 121000, cheque: '-' },
-                { sno: 6, transDate: '10/07/2024', valueDate: '10/07/2024', particulars: 'Rent Payment Property Mumbai', amount: 15000, type: 'Debit', balance: 106000, cheque: 'CHQ002' },
-                { sno: 7, transDate: '12/07/2024', valueDate: '12/07/2024', particulars: 'Restaurant Expense Dinner', amount: 1200, type: 'Debit', balance: 104800, cheque: '-' },
-                { sno: 8, transDate: '15/07/2024', valueDate: '15/07/2024', particulars: 'Fund Transfer Parent Account', amount: 25000, type: 'Credit', balance: 129800, cheque: '-' },
-                { sno: 9, transDate: '18/07/2024', valueDate: '18/07/2024', particulars: 'Insurance Premium Payment LIC', amount: 5000, type: 'Debit', balance: 124800, cheque: 'CHQ003' },
-                { sno: 10, transDate: '20/07/2024', valueDate: '20/07/2024', particulars: 'ATM Cash Withdrawal', amount: 10000, type: 'Debit', balance: 114800, cheque: '-' }
+                { sno: 3, transDate: '03/07/2024', valueDate: '03/07/2024', particulars: 'Electricity Bill Payment', amount: 2500, type: 'Debit', balance: 122500, cheque: '000456' }
             ];
-
             renderTable();
             showMessage('Sample data loaded successfully!', 'success');
         }
@@ -746,17 +730,14 @@
                 closingBalance = transaction.balance;
             });
 
-            // Update stats
             document.getElementById('totalTransactions').textContent = transactionData.length;
             document.getElementById('totalCredit').textContent = '₹' + totalCredit.toLocaleString('en-IN', {maximumFractionDigits: 0});
             document.getElementById('totalDebit').textContent = '₹' + totalDebit.toLocaleString('en-IN', {maximumFractionDigits: 0});
             document.getElementById('closingBalance').textContent = '₹' + closingBalance.toLocaleString('en-IN', {maximumFractionDigits: 0});
 
-            // Show sections
             document.getElementById('tableSection').classList.add('active');
             document.getElementById('stats').style.display = 'grid';
             
-            // Enable buttons
             document.getElementById('exportBtn').disabled = false;
             document.getElementById('clearBtn').disabled = false;
         }
@@ -768,14 +749,12 @@
             }
 
             try {
-                // Create workbook
                 const wb = XLSX.utils.book_new();
                 
-                // Prepare data for export
                 const exportData = transactionData.map(t => ({
                     'S.NO': t.sno,
-                    'Transaction Date (dd/mm/yyyy)': t.transDate,
-                    'Value Date (dd/mm/yyyy)': t.valueDate,
+                    'Transaction Date': t.transDate,
+                    'Value Date': t.valueDate,
                     'Particulars': t.particulars,
                     'Amount (INR)': t.amount,
                     'Debit/Credit': t.type,
@@ -783,46 +762,25 @@
                     'Cheque Number': t.cheque
                 }));
 
-                // Create worksheet
                 const ws = XLSX.utils.json_to_sheet(exportData);
 
-                // Set column widths
                 ws['!cols'] = [
-                    { wch: 8 },   // S.NO
-                    { wch: 20 },  // Transaction Date
-                    { wch: 20 },  // Value Date
-                    { wch: 30 },  // Particulars
-                    { wch: 15 },  // Amount
-                    { wch: 14 },  // Debit/Credit
-                    { wch: 15 },  // Balance
-                    { wch: 15 }   // Cheque Number
+                    { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 45 }, 
+                    { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 15 }
                 ];
 
-                // Add worksheet to workbook
                 XLSX.utils.book_append_sheet(wb, ws, 'Bank Statement');
 
-                // Generate filename with date
                 const date = new Date();
-                const filename = `bank_statement_${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}.xlsx`;
+                const filename = `Bank_Statement_${date.getDate()}_${date.getMonth() + 1}_${date.getFullYear()}.xlsx`;
 
-                // Write file
                 XLSX.writeFile(wb, filename);
 
-                showMessage(`✓ Excel file "${filename}" exported successfully!`, 'success');
+                showMessage(`✓ Excel file exported successfully!`, 'success');
             } catch (error) {
                 showMessage('Error exporting to Excel: ' + error.message, 'error');
                 console.error('Export Error:', error);
             }
-        }
-
-        function showMessage(message, type) {
-            const statusMessage = document.getElementById('statusMessage');
-            statusMessage.innerHTML = message;
-            statusMessage.className = `status-message ${type}`;
-
-            setTimeout(() => {
-                statusMessage.style.display = 'none';
-            }, 6000);
         }
 
         function clearData() {
