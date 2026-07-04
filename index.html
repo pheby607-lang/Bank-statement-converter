@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bank Statement Converter</title>
+    <title>Advanced Bank Statement Converter</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -23,7 +23,7 @@
         }
 
         .container-main {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 15px;
@@ -55,7 +55,7 @@
 
         .upload-section {
             background: #f8f9fa;
-            border: 2px dashed #667eea;
+            border: 3px dashed #667eea;
             border-radius: 12px;
             padding: 40px;
             text-align: center;
@@ -111,7 +111,7 @@
         }
 
         .btn-custom {
-            padding: 10px 25px;
+            padding: 12px 28px;
             border-radius: 8px;
             font-weight: 600;
             border: none;
@@ -120,6 +120,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            font-size: 1em;
         }
 
         .btn-export {
@@ -127,11 +128,16 @@
             color: white;
         }
 
-        .btn-export:hover {
+        .btn-export:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(32, 201, 151, 0.4);
             color: white;
             text-decoration: none;
+        }
+
+        .btn-export:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .btn-sample {
@@ -151,11 +157,16 @@
             color: white;
         }
 
-        .btn-clear:hover {
+        .btn-clear:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
             color: white;
             text-decoration: none;
+        }
+
+        .btn-clear:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .table-section {
@@ -179,6 +190,8 @@
             overflow-x: auto;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            max-height: 600px;
+            overflow-y: auto;
         }
 
         table {
@@ -190,6 +203,9 @@
         thead {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         th {
@@ -198,11 +214,13 @@
             font-weight: 600;
             font-size: 0.95em;
             white-space: nowrap;
+            border: 1px solid #764ba2;
         }
 
         td {
             padding: 12px 15px;
             border-bottom: 1px solid #e9ecef;
+            border-right: 1px solid #e9ecef;
             font-size: 0.95em;
         }
 
@@ -237,27 +255,35 @@
             display: none;
             font-weight: 500;
             animation: slideIn 0.3s ease;
+            border-left: 4px solid;
         }
 
         .status-message.success {
             display: block;
             background: #d4edda;
             color: #155724;
-            border-left: 4px solid #28a745;
+            border-color: #28a745;
         }
 
         .status-message.error {
             display: block;
             background: #f8d7da;
             color: #721c24;
-            border-left: 4px solid #f5c6cb;
+            border-color: #f5c6cb;
         }
 
         .status-message.info {
             display: block;
             background: #d1ecf1;
             color: #0c5460;
-            border-left: 4px solid #bee5eb;
+            border-color: #bee5eb;
+        }
+
+        .status-message.warning {
+            display: block;
+            background: #fff3cd;
+            color: #856404;
+            border-color: #ffeaa7;
         }
 
         @keyframes slideIn {
@@ -315,6 +341,10 @@
 
         .stat-box {
             text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
         }
 
         .stat-number {
@@ -327,6 +357,16 @@
             color: #666;
             font-size: 0.9em;
             margin-top: 5px;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading-spinner.active {
+            display: block;
         }
 
         @media (max-width: 768px) {
@@ -351,12 +391,16 @@
                 justify-content: center;
             }
 
+            .table-wrapper {
+                max-height: 400px;
+            }
+
             table {
                 font-size: 0.85em;
             }
 
             th, td {
-                padding: 10px 8px;
+                padding: 8px 5px;
             }
         }
     </style>
@@ -365,8 +409,8 @@
     <div class="container-main">
         <!-- Header -->
         <div class="header">
-            <h1><i class="fas fa-university"></i> Bank Statement Converter</h1>
-            <p>Convert PDF bank statements to Excel format with ease</p>
+            <h1><i class="fas fa-university"></i> Advanced Bank Statement Converter</h1>
+            <p>Smart PDF to Excel conversion with intelligent data extraction</p>
         </div>
 
         <!-- Content -->
@@ -374,29 +418,37 @@
             <!-- Features -->
             <div class="features">
                 <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-file-pdf"></i></div>
-                    <div class="feature-title">PDF Upload</div>
-                    <div class="feature-desc">Upload your bank statement PDF files</div>
+                    <div class="feature-icon"><i class="fas fa-brain"></i></div>
+                    <div class="feature-title">Smart Parsing</div>
+                    <div class="feature-desc">Advanced AI-like pattern recognition for PDFs</div>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon"><i class="fas fa-table"></i></div>
-                    <div class="feature-title">Smart Parsing</div>
-                    <div class="feature-desc">Automatically extract transaction data</div>
+                    <div class="feature-icon"><i class="fas fa-file-pdf"></i></div>
+                    <div class="feature-title">PDF Analysis</div>
+                    <div class="feature-desc">Extracts dates, amounts, and descriptions</div>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon"><i class="fas fa-file-excel"></i></div>
                     <div class="feature-title">Excel Export</div>
-                    <div class="feature-desc">Export to XLSX/XLS format instantly</div>
+                    <div class="feature-desc">Professional formatted XLSX output</div>
                 </div>
             </div>
 
             <!-- Status Messages -->
             <div class="status-message" id="statusMessage"></div>
 
+            <!-- Loading Spinner -->
+            <div class="loading-spinner" id="loadingSpinner">
+                <div class="spinner-border" role="status" style="color: #667eea;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p style="margin-top: 10px; color: #667eea; font-weight: 600;">Processing PDF...</p>
+            </div>
+
             <!-- Upload Section -->
             <div class="upload-section" id="uploadSection">
                 <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
-                <h3>Upload Bank Statement</h3>
+                <h3>Upload Bank Statement PDF</h3>
                 <p style="color: #666; margin: 10px 0;">Drag and drop your PDF file here or click to select</p>
                 <input type="file" id="fileInput" class="file-input" accept=".pdf">
                 <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
@@ -409,10 +461,10 @@
                 <button class="btn-custom btn-sample" onclick="loadSampleData()">
                     <i class="fas fa-download"></i> Load Sample Data
                 </button>
-                <button class="btn-custom btn-export" id="exportBtn" onclick="exportToExcel()" style="display: none;">
+                <button class="btn-custom btn-export" id="exportBtn" onclick="exportToExcel()" disabled>
                     <i class="fas fa-file-excel"></i> Export to Excel
                 </button>
-                <button class="btn-custom btn-clear" onclick="clearData()" style="display: none;">
+                <button class="btn-custom btn-clear" id="clearBtn" onclick="clearData()" disabled>
                     <i class="fas fa-trash-alt"></i> Clear Data
                 </button>
             </div>
@@ -421,7 +473,7 @@
             <div class="stats" id="stats" style="display: none;">
                 <div class="stat-box">
                     <div class="stat-number" id="totalTransactions">0</div>
-                    <div class="stat-label">Transactions</div>
+                    <div class="stat-label">Total Transactions</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-number" id="totalCredit">₹0</div>
@@ -431,11 +483,15 @@
                     <div class="stat-number" id="totalDebit">₹0</div>
                     <div class="stat-label">Total Debit</div>
                 </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="closingBalance">₹0</div>
+                    <div class="stat-label">Closing Balance</div>
+                </div>
             </div>
 
             <!-- Table Section -->
             <div class="table-section" id="tableSection">
-                <div class="table-title">Bank Statement Details</div>
+                <div class="table-title"><i class="fas fa-list"></i> Bank Statement Details</div>
                 <div class="table-wrapper">
                     <table id="statementTable">
                         <thead>
@@ -459,6 +515,8 @@
     </div>
 
     <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
         let transactionData = [];
 
         // File Upload Handling
@@ -484,7 +542,7 @@
             }
         });
 
-        function handleFileUpload(e) {
+        async function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
 
@@ -494,138 +552,164 @@
             }
 
             showMessage('Processing PDF...', 'info');
-            const reader = new FileReader();
+            document.getElementById('loadingSpinner').classList.add('active');
 
-            reader.onload = async (event) => {
-                try {
-                    const pdf = await pdfjsLib.getDocument(event.target.result).promise;
-                    let extractedText = '';
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let fullText = '';
 
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        extractedText += textContent.items.map(item => item.str).join(' ') + '\n';
-                    }
-
-                    parseBankStatement(extractedText);
-                } catch (error) {
-                    showMessage('Error processing PDF: ' + error.message, 'error');
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n';
                 }
-            };
 
-            reader.readAsArrayBuffer(file);
+                parseBankStatement(fullText);
+                document.getElementById('loadingSpinner').classList.remove('active');
+            } catch (error) {
+                document.getElementById('loadingSpinner').classList.remove('active');
+                showMessage('Error processing PDF: ' + error.message, 'error');
+                console.error('PDF Error:', error);
+            }
         }
 
         function parseBankStatement(text) {
-            // This is a basic parser. For production, you'd need more sophisticated parsing
             transactionData = [];
-            
             const lines = text.split('\n');
-            let balance = 0;
 
-            // Simple pattern matching for transactions
-            lines.forEach((line, index) => {
-                // Look for lines that might contain transaction data
-                const datePattern = /(\d{1,2}\/\d{1,2}\/\d{4})/g;
-                const amountPattern = /(\d+,?\d*\.?\d*)/;
+            // Enhanced regex patterns for bank statement parsing
+            const datePattern = /(\d{1,2}[-\/]\d{1,2}[-\/]\d{4}|\d{1,2}[-\/]\d{1,2}[-\/]\d{2})/;
+            const amountPattern = /(\d{1,3}(?:,\d{3})*|\d+)(?:\.\d{2})?/;
+            
+            let sno = 0;
+            let previousBalance = 0;
 
-                if (datePattern.test(line) || amountPattern.test(line)) {
-                    // Attempt to extract data
-                    // This is simplified - real implementation would need bank-specific parsing
+            // Process each line
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                // Skip empty lines and header rows
+                if (!line || line.includes('Transaction Date') || line.includes('S.NO') || line.includes('Particulars')) {
+                    continue;
                 }
-            });
+
+                // Try to match transaction pattern
+                const dates = line.match(/\d{1,2}[-\/]\d{1,2}[-\/]\d{4}/g);
+                const amounts = line.match(/\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g);
+
+                if (dates && dates.length >= 1 && amounts && amounts.length >= 1) {
+                    try {
+                        // Extract data from the line
+                        let transDate = formatDate(dates[0]);
+                        let valueDate = dates.length > 1 ? formatDate(dates[1]) : transDate;
+                        
+                        // Find particulars (text between dates)
+                        let particulars = extractParticulars(line, dates);
+                        
+                        // Process amounts
+                        let amount = parseFloat(amounts[0].replace(/,/g, ''));
+                        let balance = parseFloat(amounts[amounts.length - 1].replace(/,/g, ''));
+                        
+                        // Determine if Debit or Credit
+                        let type = 'Debit';
+                        if (i > 0 && balance > previousBalance) {
+                            type = 'Credit';
+                        } else if (balance < previousBalance) {
+                            type = 'Debit';
+                        }
+
+                        // Extract cheque number if present
+                        let cheque = extractChequeNumber(line);
+
+                        sno++;
+                        transactionData.push({
+                            sno: sno,
+                            transDate: transDate,
+                            valueDate: valueDate,
+                            particulars: particulars.substring(0, 40), // Limit length
+                            amount: amount,
+                            type: type,
+                            balance: balance,
+                            cheque: cheque
+                        });
+
+                        previousBalance = balance;
+
+                    } catch (e) {
+                        console.log('Failed to parse line:', line);
+                    }
+                }
+            }
 
             if (transactionData.length === 0) {
-                showMessage('Could not extract transactions from PDF. Please load sample data or manually enter transactions.', 'error');
+                showMessage('No transactions found in PDF. Please check format or load sample data.', 'warning');
                 loadSampleData();
             } else {
+                showMessage(`Successfully extracted ${transactionData.length} transactions from PDF!`, 'success');
                 renderTable();
-                showMessage(`Successfully extracted ${transactionData.length} transactions!`, 'success');
             }
+        }
+
+        function formatDate(dateStr) {
+            // Handle various date formats: DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY, etc.
+            let parts = dateStr.split(/[-\/]/);
+            
+            if (parts.length !== 3) return dateStr;
+            
+            let day = parts[0].padStart(2, '0');
+            let month = parts[1].padStart(2, '0');
+            let year = parts[2];
+            
+            // Handle 2-digit year
+            if (year.length === 2) {
+                year = (parseInt(year) < 50) ? '20' + year : '19' + year;
+            }
+            
+            return `${day}/${month}/${year}`;
+        }
+
+        function extractParticulars(line, dates) {
+            let particulars = line;
+            // Remove dates from the line
+            dates.forEach(date => {
+                particulars = particulars.replace(date, '').replace(/,/g, ' ');
+            });
+            // Clean up extra whitespace
+            particulars = particulars.replace(/\s+/g, ' ').trim();
+            // Remove amounts
+            particulars = particulars.replace(/\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g, '').trim();
+            return particulars || 'Transaction';
+        }
+
+        function extractChequeNumber(line) {
+            // Look for cheque number patterns
+            const chequePattern = /(?:CHQ|Check|Cheque)[:\s]+(\d+)/i;
+            const match = line.match(chequePattern);
+            if (match && match[1]) {
+                return 'CHQ' + match[1];
+            }
+            // Look for standalone numbers that might be cheques
+            const numbers = line.match(/\b\d{6,10}\b/g);
+            if (numbers && numbers.length > 0) {
+                return numbers[0];
+            }
+            return '-';
         }
 
         function loadSampleData() {
             transactionData = [
-                {
-                    sno: 1,
-                    transDate: '01/07/2024',
-                    valueDate: '01/07/2024',
-                    particulars: 'Opening Balance',
-                    amount: 50000,
-                    type: 'Credit',
-                    balance: 50000,
-                    cheque: '-'
-                },
-                {
-                    sno: 2,
-                    transDate: '02/07/2024',
-                    valueDate: '02/07/2024',
-                    particulars: 'Salary Credit - ABC Corp',
-                    amount: 75000,
-                    type: 'Credit',
-                    balance: 125000,
-                    cheque: '-'
-                },
-                {
-                    sno: 3,
-                    transDate: '03/07/2024',
-                    valueDate: '03/07/2024',
-                    particulars: 'Electricity Bill Payment',
-                    amount: 2500,
-                    type: 'Debit',
-                    balance: 122500,
-                    cheque: 'CHQ001'
-                },
-                {
-                    sno: 4,
-                    transDate: '05/07/2024',
-                    valueDate: '05/07/2024',
-                    particulars: 'Shopping - Online Purchase',
-                    amount: 5000,
-                    type: 'Debit',
-                    balance: 117500,
-                    cheque: '-'
-                },
-                {
-                    sno: 5,
-                    transDate: '08/07/2024',
-                    valueDate: '08/07/2024',
-                    particulars: 'Dividend Income',
-                    amount: 3500,
-                    type: 'Credit',
-                    balance: 121000,
-                    cheque: '-'
-                },
-                {
-                    sno: 6,
-                    transDate: '10/07/2024',
-                    valueDate: '10/07/2024',
-                    particulars: 'Rent Payment',
-                    amount: 15000,
-                    type: 'Debit',
-                    balance: 106000,
-                    cheque: 'CHQ002'
-                },
-                {
-                    sno: 7,
-                    transDate: '12/07/2024',
-                    valueDate: '12/07/2024',
-                    particulars: 'Restaurant Expense',
-                    amount: 1200,
-                    type: 'Debit',
-                    balance: 104800,
-                    cheque: '-'
-                },
-                {
-                    sno: 8,
-                    transDate: '15/07/2024',
-                    valueDate: '15/07/2024',
-                    particulars: 'Fund Transfer From Parent',
-                    amount: 25000,
-                    type: 'Credit',
-                    balance: 129800,
-                    cheque: '-'
-                }
+                { sno: 1, transDate: '01/07/2024', valueDate: '01/07/2024', particulars: 'Opening Balance', amount: 50000, type: 'Credit', balance: 50000, cheque: '-' },
+                { sno: 2, transDate: '02/07/2024', valueDate: '02/07/2024', particulars: 'Salary Credit - ABC Corporation', amount: 75000, type: 'Credit', balance: 125000, cheque: '-' },
+                { sno: 3, transDate: '03/07/2024', valueDate: '03/07/2024', particulars: 'Electricity Bill Payment TATA Power', amount: 2500, type: 'Debit', balance: 122500, cheque: 'CHQ001' },
+                { sno: 4, transDate: '05/07/2024', valueDate: '05/07/2024', particulars: 'Shopping Online Purchase Amazon', amount: 5000, type: 'Debit', balance: 117500, cheque: '-' },
+                { sno: 5, transDate: '08/07/2024', valueDate: '08/07/2024', particulars: 'Dividend Income Investment Account', amount: 3500, type: 'Credit', balance: 121000, cheque: '-' },
+                { sno: 6, transDate: '10/07/2024', valueDate: '10/07/2024', particulars: 'Rent Payment Property Mumbai', amount: 15000, type: 'Debit', balance: 106000, cheque: 'CHQ002' },
+                { sno: 7, transDate: '12/07/2024', valueDate: '12/07/2024', particulars: 'Restaurant Expense Dinner', amount: 1200, type: 'Debit', balance: 104800, cheque: '-' },
+                { sno: 8, transDate: '15/07/2024', valueDate: '15/07/2024', particulars: 'Fund Transfer Parent Account', amount: 25000, type: 'Credit', balance: 129800, cheque: '-' },
+                { sno: 9, transDate: '18/07/2024', valueDate: '18/07/2024', particulars: 'Insurance Premium Payment LIC', amount: 5000, type: 'Debit', balance: 124800, cheque: 'CHQ003' },
+                { sno: 10, transDate: '20/07/2024', valueDate: '20/07/2024', particulars: 'ATM Cash Withdrawal', amount: 10000, type: 'Debit', balance: 114800, cheque: '-' }
             ];
 
             renderTable();
@@ -638,39 +722,43 @@
 
             let totalCredit = 0;
             let totalDebit = 0;
+            let closingBalance = 0;
 
             transactionData.forEach(transaction => {
-                const row = `
-                    <tr>
-                        <td>${transaction.sno}</td>
-                        <td>${transaction.transDate}</td>
-                        <td>${transaction.valueDate}</td>
-                        <td>${transaction.particulars}</td>
-                        <td class="amount">₹${transaction.amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-                        <td><span class="${transaction.type === 'Credit' ? 'credit' : 'debit'}">${transaction.type}</span></td>
-                        <td class="amount">₹${transaction.balance.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-                        <td>${transaction.cheque}</td>
-                    </tr>
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${transaction.sno}</td>
+                    <td>${transaction.transDate}</td>
+                    <td>${transaction.valueDate}</td>
+                    <td>${transaction.particulars}</td>
+                    <td class="amount">₹${transaction.amount.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td><span class="${transaction.type === 'Credit' ? 'credit' : 'debit'}">${transaction.type}</span></td>
+                    <td class="amount">₹${transaction.balance.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>${transaction.cheque}</td>
                 `;
-                tableBody.innerHTML += row;
+                tableBody.appendChild(row);
 
                 if (transaction.type === 'Credit') {
                     totalCredit += transaction.amount;
                 } else {
                     totalDebit += transaction.amount;
                 }
+                closingBalance = transaction.balance;
             });
 
             // Update stats
             document.getElementById('totalTransactions').textContent = transactionData.length;
             document.getElementById('totalCredit').textContent = '₹' + totalCredit.toLocaleString('en-IN', {maximumFractionDigits: 0});
             document.getElementById('totalDebit').textContent = '₹' + totalDebit.toLocaleString('en-IN', {maximumFractionDigits: 0});
+            document.getElementById('closingBalance').textContent = '₹' + closingBalance.toLocaleString('en-IN', {maximumFractionDigits: 0});
 
             // Show sections
             document.getElementById('tableSection').classList.add('active');
             document.getElementById('stats').style.display = 'grid';
-            document.getElementById('exportBtn').style.display = 'flex';
-            document.querySelectorAll('.btn-clear')[0].parentElement.querySelector('.btn-clear').style.display = 'flex';
+            
+            // Enable buttons
+            document.getElementById('exportBtn').disabled = false;
+            document.getElementById('clearBtn').disabled = false;
         }
 
         function exportToExcel() {
@@ -679,8 +767,12 @@
                 return;
             }
 
-            const worksheet = XLSX.utils.json_to_sheet(
-                transactionData.map(t => ({
+            try {
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                
+                // Prepare data for export
+                const exportData = transactionData.map(t => ({
                     'S.NO': t.sno,
                     'Transaction Date (dd/mm/yyyy)': t.transDate,
                     'Value Date (dd/mm/yyyy)': t.valueDate,
@@ -689,36 +781,48 @@
                     'Debit/Credit': t.type,
                     'Balance (INR)': t.balance,
                     'Cheque Number': t.cheque
-                }))
-            );
+                }));
 
-            // Set column widths
-            worksheet['!cols'] = [
-                { wch: 8 },   // S.NO
-                { wch: 20 },  // Transaction Date
-                { wch: 20 },  // Value Date
-                { wch: 25 },  // Particulars
-                { wch: 15 },  // Amount
-                { wch: 12 },  // Debit/Credit
-                { wch: 15 },  // Balance
-                { wch: 15 }   // Cheque Number
-            ];
+                // Create worksheet
+                const ws = XLSX.utils.json_to_sheet(exportData);
 
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Bank Statement');
-            XLSX.writeFile(workbook, 'bank_statement.xlsx');
+                // Set column widths
+                ws['!cols'] = [
+                    { wch: 8 },   // S.NO
+                    { wch: 20 },  // Transaction Date
+                    { wch: 20 },  // Value Date
+                    { wch: 30 },  // Particulars
+                    { wch: 15 },  // Amount
+                    { wch: 14 },  // Debit/Credit
+                    { wch: 15 },  // Balance
+                    { wch: 15 }   // Cheque Number
+                ];
 
-            showMessage('Excel file exported successfully!', 'success');
+                // Add worksheet to workbook
+                XLSX.utils.book_append_sheet(wb, ws, 'Bank Statement');
+
+                // Generate filename with date
+                const date = new Date();
+                const filename = `bank_statement_${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}.xlsx`;
+
+                // Write file
+                XLSX.writeFile(wb, filename);
+
+                showMessage(`✓ Excel file "${filename}" exported successfully!`, 'success');
+            } catch (error) {
+                showMessage('Error exporting to Excel: ' + error.message, 'error');
+                console.error('Export Error:', error);
+            }
         }
 
         function showMessage(message, type) {
             const statusMessage = document.getElementById('statusMessage');
-            statusMessage.textContent = message;
+            statusMessage.innerHTML = message;
             statusMessage.className = `status-message ${type}`;
 
             setTimeout(() => {
                 statusMessage.style.display = 'none';
-            }, 5000);
+            }, 6000);
         }
 
         function clearData() {
@@ -726,10 +830,10 @@
             document.getElementById('tableBody').innerHTML = '';
             document.getElementById('tableSection').classList.remove('active');
             document.getElementById('stats').style.display = 'none';
-            document.getElementById('exportBtn').style.display = 'none';
-            document.querySelectorAll('.btn-clear').forEach(btn => btn.style.display = 'none');
+            document.getElementById('exportBtn').disabled = true;
+            document.getElementById('clearBtn').disabled = true;
             document.getElementById('fileInput').value = '';
-            showMessage('Data cleared successfully', 'info');
+            showMessage('All data cleared successfully', 'info');
         }
     </script>
 </body>
