@@ -417,7 +417,7 @@
                 <div class="feature-card">
                     <div class="feature-icon"><i class="fas fa-brain"></i></div>
                     <div class="feature-title">Smart Parsing</div>
-                    <div class="feature-desc">Advanced AI-like pattern recognition for PDFs</div>
+                    <div class="feature-desc">Advanced pattern recognition for PDFs</div>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon"><i class="fas fa-file-pdf"></i></div>
@@ -488,8 +488,8 @@
                         <thead>
                             <tr>
                                 <th>S.NO</th>
-                                <th>Transaction Date (dd/mm/yyyy)</th>
-                                <th>Value Date (dd/mm/yyyy)</th>
+                                <th>Transaction Date</th>
+                                <th>Value Date</th>
                                 <th>Particulars</th>
                                 <th style="text-align: right;">Amount (INR)</th>
                                 <th>Debit/Credit</th>
@@ -509,6 +509,12 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let transactionData = [];
+
+        function showMessage(text, type) {
+            const msgBox = document.getElementById('statusMessage');
+            msgBox.textContent = text;
+            msgBox.className = 'status-message ' + type;
+        }
 
         // File Upload Handling
         document.getElementById('fileInput').addEventListener('change', handleFileUpload);
@@ -557,16 +563,16 @@
                     let pageText = '';
                     let lastY = null;
 
-                    // FIX 1: Detect line breaks based on Y-coordinates
+                    // FIX 1: Added a 3-pixel tolerance for Y-coordinates to keep text on the same line
                     textContent.items.forEach(item => {
-                        // transform[5] represents the vertical position of the text block
-                        if (lastY !== item.transform[5] && lastY !== null) {
+                        let currentY = item.transform[5];
+                        if (lastY !== null && Math.abs(lastY - currentY) > 3) {
                             pageText += '\n'; // Start a new line
-                        } else {
+                        } else if (lastY !== null) {
                             pageText += ' '; // Add space between words on the same line
                         }
                         pageText += item.str.trim();
-                        lastY = item.transform[5];
+                        lastY = currentY;
                     });
                     
                     fullText += pageText + '\n';
@@ -595,28 +601,31 @@
                     continue;
                 }
 
-                // FIX 2: Stricter Regex
                 // Matches dates like DD/MM/YYYY, DD-MM-YY, DD.MM.YYYY
                 const dates = line.match(/\d{1,2}[-\/\.]\d{1,2}[-\/\.]\d{2,4}/g);
                 
-                // Matches proper currency formats (must end in decimal) to avoid grabbing cheque numbers
-                const amounts = line.match(/\d{1,3}(?:,\d{3})*\.\d{2}/g); 
+                // FIX 2: Updated Regex to catch Indian number formats (lakhs/crores) and numbers without commas
+                const amounts = line.match(/(?:\d+,)*\d+\.\d{2}/g); 
 
                 if (dates && dates.length >= 1 && amounts && amounts.length >= 1) {
                     try {
                         let transDate = formatDate(dates[0]);
                         let valueDate = dates.length > 1 ? formatDate(dates[1]) : transDate;
                         
-                        let particulars = extractParticulars(line, dates);
+                        let particulars = extractParticulars(line, dates, amounts);
                         
-                        // Parse amounts properly
-                        let amount = parseFloat(amounts[0].replace(/,/g, ''));
-                        let balance = parseFloat(amounts[amounts.length - 1].replace(/,/g, ''));
+                        // Grab the first amount (transaction) and last amount (balance)
+                        let amountStr = amounts[0].replace(/,/g, '');
+                        let balanceStr = amounts[amounts.length - 1].replace(/,/g, '');
+                        
+                        let amount = parseFloat(amountStr);
+                        let balance = parseFloat(balanceStr);
                         
                         let type = 'Debit';
-                        if (i > 0 && balance >= previousBalance) {
+                        // Logic to figure out debit vs credit based on balance change
+                        if (transactionData.length > 0 && balance >= previousBalance) {
                             type = 'Credit';
-                        } else if (balance < previousBalance) {
+                        } else if (transactionData.length > 0 && balance < previousBalance) {
                             type = 'Debit';
                         }
 
@@ -627,7 +636,7 @@
                             sno: sno,
                             transDate: transDate,
                             valueDate: valueDate,
-                            particulars: particulars.substring(0, 50),
+                            particulars: particulars.substring(0, 70), // Slightly longer particulars allowed
                             amount: amount,
                             type: type,
                             balance: balance,
@@ -643,7 +652,8 @@
             }
 
             if (transactionData.length === 0) {
-                showMessage('No transactions found in PDF. The statement format might not match the parser.', 'warning');
+                showMessage('No transactions found. The PDF formatting might be unique. Check console for output.', 'error');
+                console.log("Raw Extracted Text:\n", text); // Useful for debugging if it fails again
             } else {
                 showMessage(`Successfully extracted ${transactionData.length} transactions from PDF!`, 'success');
                 renderTable();
@@ -665,14 +675,19 @@
             return `${day}/${month}/${year}`;
         }
 
-        function extractParticulars(line, dates) {
+        function extractParticulars(line, dates, amounts) {
             let particulars = line;
+            // Remove dates from the string
             dates.forEach(date => {
-                particulars = particulars.replace(date, '').replace(/,/g, ' ');
+                particulars = particulars.replace(date, '');
             });
+            // Remove all matched amounts from the string
+            amounts.forEach(amt => {
+                particulars = particulars.replace(amt, '');
+            });
+            
+            // Clean up extra spaces
             particulars = particulars.replace(/\s+/g, ' ').trim();
-            // Remove amounts from particulars text
-            particulars = particulars.replace(/\d{1,3}(?:,\d{3})*\.\d{2}/g, '').trim();
             return particulars || 'Transaction';
         }
 
@@ -682,7 +697,6 @@
             if (match && match[1]) {
                 return 'CHQ' + match[1];
             }
-            // Looks for isolated 6-digit cheque numbers common in banking
             const numbers = line.match(/\b\d{6}\b/g);
             if (numbers && numbers.length > 0) {
                 return numbers[0];
